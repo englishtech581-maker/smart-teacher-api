@@ -6,13 +6,13 @@ const { assertClassAccess } = require("../utils");
 const router = express.Router();
 
 router.post("/:classId/students", requireAuth, requireRole("teacher"), async (req, res) => {
-  const { name, parentEmail } = req.body;
+  const { name, parentEmail, parentPhone } = req.body;
   if (!name) return res.status(400).json({ error: "name is required" });
   try {
     await assertClassAccess(req.params.classId, req.user);
     const result = await pool.query(
-      "INSERT INTO students (class_id, name, parent_email) VALUES ($1, $2, $3) RETURNING *",
-      [req.params.classId, name, parentEmail ? parentEmail.toLowerCase() : null]
+      "INSERT INTO students (class_id, name, parent_email, parent_phone) VALUES ($1, $2, $3, $4) RETURNING *",
+      [req.params.classId, name, parentEmail ? parentEmail.toLowerCase() : null, parentPhone ? parentPhone.trim() : null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
