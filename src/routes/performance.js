@@ -5,15 +5,17 @@ const { assertClassAccess } = require("../utils");
 
 const router = express.Router();
 
+// Record a new performance entry (quiz + homework) for a student.
+// Kept as history (one row per entry) rather than overwritten, so trends can be added later.
 router.post("/:classId/performance", requireAuth, requireRole("teacher"), async (req, res) => {
-  const { studentId, quizScore, quizMax, homeworkStatus, topic } = req.body;
+  const { studentId, quizScore, quizMax, homeworkStatus, topic, conductStatus, conductNotes } = req.body;
   if (!studentId) return res.status(400).json({ error: "studentId is required" });
   try {
     await assertClassAccess(req.params.classId, req.user);
     const result = await pool.query(
-      `INSERT INTO performance (student_id, class_id, quiz_score, quiz_max, homework_status, topic)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [studentId, req.params.classId, quizScore ?? null, quizMax ?? null, homeworkStatus || null, topic || null]
+      `INSERT INTO performance (student_id, class_id, quiz_score, quiz_max, homework_status, topic, conduct_status, conduct_notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [studentId, req.params.classId, quizScore ?? null, quizMax ?? null, homeworkStatus || null, topic || null, conductStatus || null, conductNotes || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -21,6 +23,7 @@ router.post("/:classId/performance", requireAuth, requireRole("teacher"), async 
   }
 });
 
+// Latest performance entry per student in this class.
 router.get("/:classId/performance/latest", requireAuth, async (req, res) => {
   try {
     await assertClassAccess(req.params.classId, req.user);
