@@ -11,6 +11,8 @@ function computePerformance(quizPct, homeworkStatus, attendancePct) {
   return "At Risk";
 }
 
+// Pulls a student's latest quiz/homework entry and this month's attendance
+// straight from the database, so AI routes never have to trust client-supplied numbers.
 async function getStudentMetrics(studentId) {
   const perfRes = await pool.query(
     "SELECT * FROM performance WHERE student_id = $1 ORDER BY recorded_at DESC LIMIT 1",
@@ -20,6 +22,8 @@ async function getStudentMetrics(studentId) {
   const quizPct = perf && perf.quiz_max > 0 ? (Number(perf.quiz_score) / Number(perf.quiz_max)) * 100 : 0;
   const homeworkStatus = perf ? perf.homework_status : "Average";
   const topic = perf ? perf.topic : null;
+  const conductStatus = perf ? perf.conduct_status : null;
+  const conductNotes = perf ? perf.conduct_notes : null;
 
   const attRes = await pool.query(
     `SELECT
@@ -33,7 +37,7 @@ async function getStudentMetrics(studentId) {
   const a = attRes.rows[0];
   const attendancePct = Number(a.total) > 0 ? ((Number(a.present) + Number(a.late) * 0.5) / Number(a.total)) * 100 : 100;
 
-  return { quizPct, homeworkStatus, attendancePct, topic, performance: computePerformance(quizPct, homeworkStatus, attendancePct) };
+  return { quizPct, homeworkStatus, attendancePct, topic, conductStatus, conductNotes, performance: computePerformance(quizPct, homeworkStatus, attendancePct) };
 }
 
 module.exports = { computePerformance, getStudentMetrics };
