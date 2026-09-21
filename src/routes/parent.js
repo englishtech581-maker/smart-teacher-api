@@ -4,14 +4,18 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
+// Returns every student linked to this parent, matched by either parent_email
+// or parent_phone. A parent without an email simply registers using their
+// phone number in the email/login field, and it's matched here either way.
 router.get("/children", requireAuth, requireRole("parent"), async (req, res) => {
   try {
+    const loginId = req.user.email.toLowerCase();
     const students = await pool.query(
       `SELECT s.*, c.subject, c.grade
        FROM students s
        JOIN classes c ON c.id = s.class_id
-       WHERE s.parent_email = $1`,
-      [req.user.email.toLowerCase()]
+       WHERE s.parent_email = $1 OR s.parent_phone = $1`,
+      [loginId]
     );
 
     const children = [];
