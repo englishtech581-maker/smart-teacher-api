@@ -9,11 +9,14 @@ router.get("/dashboard", requireAuth, requireRole("admin"), async (req, res) => 
     const schoolId = req.user.schoolId;
 
     const totalStudents = await pool.query(
-      `SELECT COUNT(*) FROM students s JOIN classes c ON c.id = s.class_id WHERE c.school_id = $1`,
+      `SELECT COUNT(*) FROM students WHERE school_id = $1`,
       [schoolId]
     );
 
+    const sectionCount = await pool.query(`SELECT COUNT(*) FROM sections WHERE school_id = $1`, [schoolId]);
     const classCount = await pool.query(`SELECT COUNT(*) FROM classes WHERE school_id = $1`, [schoolId]);
+    const staffRows = await pool.query(`SELECT COUNT(*) FROM staff WHERE school_id = $1`, [schoolId]);
+    const teacherRows = await pool.query(`SELECT COUNT(*) FROM users WHERE school_id = $1 AND role = 'teacher'`, [schoolId]);
 
     const todayAttendance = await pool.query(
       `SELECT
@@ -25,6 +28,7 @@ router.get("/dashboard", requireAuth, requireRole("admin"), async (req, res) => 
       [schoolId]
     );
 
+    // Latest performance per student, joined to their latest attendance rate this month.
     const latestPerf = await pool.query(
       `SELECT DISTINCT ON (p.student_id) p.student_id, p.quiz_score, p.quiz_max, p.homework_status
        FROM performance p
@@ -44,14 +48,15 @@ router.get("/dashboard", requireAuth, requireRole("admin"), async (req, res) => 
       const quizPct = r.quiz_max > 0 ? (Number(r.quiz_score) / Number(r.quiz_max)) * 100 : 0;
       const hwPoints = { Good: 3, Average: 2, Weak: 1, Missing: 0 }[r.homework_status] ?? 1;
       const quizPoints = quizPct >= 80 ? 3 : quizPct >= 60 ? 2 : quizPct >= 40 ? 1 : 0;
-      const score = (hwPoints + quizPoints + 3) / 9;
+      const score = (hwPoints + quizPoints + 3) / 9; // attendance term simplified here; refine later with real join
       if (score < 0.6) needingSupport += 1;
     });
 
     const att = todayAttendance.rows[0];
     res.json({
       totalStudents: Number(totalStudents.rows[0].count),
-      classCount: Number(classCount.rows[0].count),
+      classCount: Number(sectionCount.rows[0].count) || Number(classCount.rows[0].count),
+      staffCount: Number(staffRows.rows[0].count) || Number(teacherRows.rows[0].count),
       todayAttendancePct: Number(att.total) > 0 ? Math.round((Number(att.present) / Number(att.total)) * 100) : null,
       needingSupport,
       pendingHomework,

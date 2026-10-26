@@ -4,6 +4,9 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const { assertClassAccess } = require("../utils");
 const { callClaude, parseJSON } = require("../aiClient");
 const { getStudentMetrics } = require("../metrics");
+const { normPhone } = require("../text");
+const { spend } = require("../aiLimit");
+const crypto = require("crypto");
 
 const router = express.Router();
 
@@ -35,8 +38,16 @@ Respond with ONLY a single valid JSON object, no markdown fences, no preamble. K
   const user = `Subject: ${subject}\nClass: ${klass}\nChapter: ${chapter || ""}\nTopic: ${topic}`;
 
   try {
+    const key = crypto.createHash("sha256")
+      .update(JSON.stringify([subject, klass, chapter || "", topic, language || "en"].map((x) => String(x || "").trim().toLowerCase())))
+      .digest("hex");
+    const saved = await pool.query("SELECT response FROM ai_cache WHERE key = $1", [key]);
+    if (saved.rowCount) return res.json(saved.rows[0].response);
+    if (!(await spend(req, res))) return;
     const text = await callClaude({ system, user, maxTokens: 1000 });
-    res.json(parseJSON(text));
+    const guide = parseJSON(text);
+    await pool.query("INSERT INTO ai_cache (key, response) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING", [key, JSON.stringify(guide)]);
+    res.json(guide);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || "Could not generate lesson guide" });
   }
@@ -51,7 +62,11 @@ router.post("/student-insight", requireAuth, requireRole("teacher"), async (req,
 
   try {
     const klass = await assertClassAccess(classId, req.user);
-    const studentRes = await pool.query("SELECT * FROM students WHERE id = $1 AND class_id = $2", [studentId, classId]);
+    const studentRes = await pool.query(
+      `SELECT * FROM students WHERE id = $1
+         AND (class_id = $2 OR (section_id IS NOT NULL AND section_id = (SELECT section_id FROM classes WHERE id = $2)))`,
+      [studentId, classId]
+    );
     const student = studentRes.rows[0];
     if (!student) return res.status(404).json({ error: "Student not found in this class" });
 
@@ -66,6 +81,7 @@ router.post("/student-insight", requireAuth, requireRole("teacher"), async (req,
 Be specific to the subject/topic, not generic. If conduct information is given and shows a concern, weigh it alongside academics.`;
     const user = `Student: ${student.name}\nSubject: ${klass.subject}, Class: ${klass.grade}, Topic: ${topic || klass.topic || "current topic"}\nQuiz score: ${Math.round(quizPct)}%\nHomework: ${homeworkStatus}\nAttendance: ${Math.round(attendancePct)}%\nCurrent performance label: ${performance}${conductStatus ? `\nConduct/ethics: ${conductStatus}${conductNotes ? ` (${conductNotes})` : ""}` : ""}`;
 
+    if (!(await spend(req, res))) return;
     const text = await callClaude({ system, user, maxTokens: 1000 });
     res.json(parseJSON(text));
   } catch (err) {
@@ -97,6 +113,7 @@ If any students are flagged for conduct concerns rather than academics, mention 
       ? `At-risk / needs-support students across the institute:\n${atRiskList.map((s) => `- ${s.name} (${s.classLabel}): quiz ${Math.round(s.quizPct)}%, homework ${s.homework}, performance ${s.performance}${s.conductStatus ? `, conduct: ${s.conductStatus}` : ""}`).join("\n")}`
       : "No students are currently flagged At Risk, Needs Support, or a conduct concern.";
 
+    if (!(await spend(req, res))) return;
     const text = await callClaude({ system, user, maxTokens: 1000 });
     const parsed = parseJSON(text);
     res.json({ briefing: parsed.briefing, atRiskCount: atRiskList.length });
@@ -107,20 +124,24 @@ If any students are flagged for conduct concerns rather than academics, mention 
 
 // ---- Plain-language report for a parent ----
 // Ownership is checked server-side: a parent can only request a report for a
-// child whose parent_email or parent_phone matches their own login.
+// child whose parent_email matches their own login email.
 router.post("/parent-report", requireAuth, requireRole("parent"), async (req, res) => {
   const { studentId, language } = req.body;
   if (!studentId) return res.status(400).json({ error: "studentId is required" });
 
   try {
     const studentRes = await pool.query(
-      "SELECT s.*, c.subject, c.grade FROM students s JOIN classes c ON c.id = s.class_id WHERE s.id = $1",
+      `SELECT s.*, c.subject, COALESCE(c.grade, sec.grade) AS grade
+       FROM students s
+       LEFT JOIN classes c ON c.id = s.class_id
+       LEFT JOIN sections sec ON sec.id = s.section_id
+       WHERE s.id = $1`,
       [studentId]
     );
     const student = studentRes.rows[0];
     if (!student) return res.status(404).json({ error: "Student not found" });
     const loginId = req.user.email.toLowerCase();
-    const isOwner = student.parent_email === loginId || student.parent_phone === loginId;
+    const isOwner = student.parent_email === loginId || (!!student.parent_phone && student.parent_phone === normPhone(loginId));
     if (!isOwner) {
       return res.status(403).json({ error: "Not allowed to view this child's report" });
     }
@@ -137,8 +158,9 @@ router.post("/parent-report", requireAuth, requireRole("parent"), async (req, re
  "areasToImprove": ["1-2 short, specific, non-alarming points"],
  "homeSupportTip": "one short concrete thing the parent can do at home"
 }`;
-    const user = `Child: ${student.name}\nSubject: ${student.subject}, Class: ${student.grade}\nQuiz score: ${Math.round(quizPct)}%\nHomework habits: ${homeworkStatus}\nAttendance: ${Math.round(attendancePct)}%\nOverall performance: ${performance}${conductStatus ? `\nConduct/ethics: ${conductStatus}${conductNotes ? ` (${conductNotes})` : ""}` : ""}`;
+    const user = `Child: ${student.name}\nSubject: ${student.subject || "all subjects"}, Class: ${student.grade}\nQuiz score: ${Math.round(quizPct)}%\nHomework habits: ${homeworkStatus}\nAttendance: ${Math.round(attendancePct)}%\nOverall performance: ${performance}${conductStatus ? `\nConduct/ethics: ${conductStatus}${conductNotes ? ` (${conductNotes})` : ""}` : ""}`;
 
+    if (!(await spend(req, res))) return;
     const text = await callClaude({ system, user, maxTokens: 1000 });
     res.json(parseJSON(text));
   } catch (err) {

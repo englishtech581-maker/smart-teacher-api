@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { normId } = require("../text");
 const pool = require("../db");
 
 const router = express.Router();
@@ -13,6 +14,11 @@ function signToken(user) {
   );
 }
 
+/**
+ * Register a new user.
+ * - role "admin": also creates a brand-new school (schoolName required).
+ * - role "teacher" or "parent": joins an existing school (schoolId required).
+ */
 router.post("/register", async (req, res) => {
   const { name, email, password, role, schoolName, schoolId } = req.body;
   if (!name || !email || !password || !role) {
@@ -45,7 +51,7 @@ router.post("/register", async (req, res) => {
       `INSERT INTO users (school_id, name, email, password_hash, role)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, school_id, name, email, role`,
-      [finalSchoolId, name, email.toLowerCase(), passwordHash, role]
+      [finalSchoolId, name, normId(email), passwordHash, role]
     );
 
     await client.query("COMMIT");
@@ -68,7 +74,7 @@ router.post("/login", async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: "email and password are required" });
 
   try {
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email.toLowerCase()]);
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [normId(email)]);
     const user = result.rows[0];
     if (!user) return res.status(401).json({ error: "Invalid email or password" });
 

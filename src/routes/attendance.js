@@ -5,6 +5,8 @@ const { assertClassAccess } = require("../utils");
 
 const router = express.Router();
 
+// Mark attendance for a whole class on one date.
+// body: { date: "2026-09-14", records: [{ studentId, status }] }
 router.post("/:classId/attendance", requireAuth, requireRole("teacher"), async (req, res) => {
   const { date, records } = req.body;
   if (!date || !Array.isArray(records)) return res.status(400).json({ error: "date and records[] are required" });
@@ -31,6 +33,7 @@ router.post("/:classId/attendance", requireAuth, requireRole("teacher"), async (
   }
 });
 
+// Get one day's attendance for a class.
 router.get("/:classId/attendance", requireAuth, async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ error: "date query param is required" });
@@ -46,8 +49,9 @@ router.get("/:classId/attendance", requireAuth, async (req, res) => {
   }
 });
 
+// Monthly rollup: present/late/total and percentage per student.
 router.get("/:classId/attendance/monthly", requireAuth, async (req, res) => {
-  const { month } = req.query;
+  const { month } = req.query; // "2026-09"
   if (!month) return res.status(400).json({ error: "month query param is required, e.g. 2026-09" });
   try {
     await assertClassAccess(req.params.classId, req.user);
@@ -58,7 +62,7 @@ router.get("/:classId/attendance/monthly", requireAuth, async (req, res) => {
               COUNT(*) AS total
        FROM students s
        LEFT JOIN attendance a ON a.student_id = s.id AND to_char(a.att_date, 'YYYY-MM') = $2
-       WHERE s.class_id = $1
+       WHERE (s.class_id = $1 OR (s.section_id IS NOT NULL AND s.section_id = (SELECT section_id FROM classes WHERE id = $1)))
        GROUP BY s.id, s.name
        ORDER BY s.name`,
       [req.params.classId, month]

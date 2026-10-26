@@ -1,7 +1,10 @@
+-- NOTE: the server now creates and updates its own tables every time it starts (see src/migrate.js).
+-- This file is only a record of the first version of the database. You do not need to run it by hand.
+
 -- Smart Teacher & Institute Assistant — pilot schema
 -- Run this once against a fresh Postgres database (Supabase, Railway, etc.)
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgcrypto; -- gives us gen_random_uuid()
 
 CREATE TABLE schools (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,7 +37,7 @@ CREATE TABLE students (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  parent_email TEXT,
+  parent_email TEXT, -- a parent account with this email can view this child
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -66,3 +69,7 @@ CREATE INDEX idx_students_class ON students(class_id);
 CREATE INDEX idx_attendance_student ON attendance(student_id);
 CREATE INDEX idx_attendance_class_date ON attendance(class_id, att_date);
 CREATE INDEX idx_performance_student ON performance(student_id);
+
+-- Not included yet, on purpose (add only once the pilot proves they're needed):
+--   subscriptions / billing tables
+--   lessons table (AI lesson guides are currently generated on the fly, not stored)
