@@ -17,7 +17,12 @@ function normId(v) {
   return s.includes("@") ? s.toLowerCase() : normPhone(s);
 }
 
-// "7-A", "7A", "Class 7 A", "10th B", "7" -> { grade: "7", section: "A" }
+const WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+const EARLY = ["nursery", "prep", "kg", "lkg", "ukg", "pg", "playgroup", "montessori", "reception"];
+
+// "7-A", "7A", "Class 7 A", "10th B", "Seven A", "KG" -> { grade: "7", section: "A" }
+// Anything that is not a number, a number word or a known early class is refused, so a typo
+// cannot create a new class by accident.
 function parseClass(v) {
   const s = String(v || "")
     .replace(/class|grade/gi, "")
@@ -25,7 +30,14 @@ function parseClass(v) {
     .trim();
   const m = s.match(/^(\d+|[A-Za-z]+)\s*[-\s]?\s*([A-Za-z]?)$/);
   if (!m) return null;
-  return { grade: m[1], section: (m[2] || "A").toUpperCase() };
+  let grade = m[1];
+  if (!/^\d+$/.test(grade)) {
+    const w = grade.toLowerCase();
+    if (WORDS[w]) grade = String(WORDS[w]);
+    else if (EARLY.includes(w)) grade = w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1);
+    else return null;
+  }
+  return { grade, section: (m[2] || "A").toUpperCase() };
 }
 
 function toDate(v) {
