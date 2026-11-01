@@ -90,7 +90,7 @@ router.get("/teachers", async (req, res) => {
 router.get("/staff", async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id, name, role, department, phone, email, joined_on FROM staff WHERE school_id = $1 ORDER BY name",
+      "SELECT id, name, role, department, phone, email, to_char(joined_on, 'YYYY-MM-DD') AS joined_on FROM staff WHERE school_id = $1 ORDER BY name",
       [req.user.schoolId]
     );
     res.json(r.rows);

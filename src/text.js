@@ -40,9 +40,20 @@ function parseClass(v) {
   return { grade, section: (m[2] || "A").toUpperCase() };
 }
 
+// Dates arrive as 2017-04-01 (from the spreadsheet reader) or typed by hand as 01/04/2017.
+// Typed dates are read day first, the way they are written in Pakistan.
 function toDate(v) {
-  const d = new Date(String(v || ""));
-  return isNaN(d) ? null : d.toISOString().slice(0, 10);
+  const s = String(v || "").trim();
+  if (!s) return null;
+  let y, mo, d, m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/))) {
+    d = +m[1]; mo = +m[2]; y = +m[3];
+    if (y < 100) y += y < 50 ? 2000 : 1900;
+  } else return null;
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return null; // not a real date
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 module.exports = { normPhone, normId, parseClass, toDate };
