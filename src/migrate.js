@@ -68,7 +68,137 @@ const STEPS = [
      response JSONB NOT NULL,
      created_at TIMESTAMPTZ DEFAULT now()
    )`,
+
+  // ---- exams, marks, co-curricular ----
+  `CREATE TABLE IF NOT EXISTS exams (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     name TEXT NOT NULL,
+     term TEXT,
+     year INT NOT NULL DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+  `CREATE TABLE IF NOT EXISTS exam_marks (
+     exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
+     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+     subject TEXT NOT NULL,
+     marks NUMERIC NOT NULL,
+     total NUMERIC NOT NULL,
+     PRIMARY KEY (exam_id, student_id, subject)
+   )`,
+  `CREATE TABLE IF NOT EXISTS activities (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+     category TEXT,
+     activity TEXT NOT NULL,
+     marks NUMERIC,
+     total NUMERIC,
+     year INT NOT NULL DEFAULT EXTRACT(YEAR FROM CURRENT_DATE),
+     note TEXT,
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+
+  // ---- fees ----
+  `CREATE TABLE IF NOT EXISTS fee_charges (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     month TEXT NOT NULL,
+     amount NUMERIC NOT NULL,
+     created_at TIMESTAMPTZ DEFAULT now(),
+     UNIQUE (student_id, title, month)
+   )`,
+  `CREATE TABLE IF NOT EXISTS fee_payments (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     charge_id UUID NOT NULL REFERENCES fee_charges(id) ON DELETE CASCADE,
+     amount NUMERIC NOT NULL,
+     paid_on DATE NOT NULL DEFAULT CURRENT_DATE,
+     method TEXT,
+     note TEXT
+   )`,
+
+  // ---- staff attendance, leave, salary, reviews ----
+  `ALTER TABLE staff ADD COLUMN IF NOT EXISTS base_salary NUMERIC`,
+  `CREATE TABLE IF NOT EXISTS staff_attendance (
+     staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+     att_date DATE NOT NULL,
+     status TEXT NOT NULL,
+     PRIMARY KEY (staff_id, att_date)
+   )`,
+  `CREATE TABLE IF NOT EXISTS leave_requests (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+     from_date DATE NOT NULL,
+     to_date DATE NOT NULL,
+     kind TEXT,
+     reason TEXT,
+     status TEXT NOT NULL DEFAULT 'pending',
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+  `CREATE TABLE IF NOT EXISTS payroll (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+     month TEXT NOT NULL,
+     base NUMERIC NOT NULL,
+     allowances NUMERIC NOT NULL DEFAULT 0,
+     deductions NUMERIC NOT NULL DEFAULT 0,
+     status TEXT NOT NULL DEFAULT 'unpaid',
+     paid_on DATE,
+     UNIQUE (staff_id, month)
+   )`,
+  `CREATE TABLE IF NOT EXISTS staff_reviews (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+     review_date DATE NOT NULL DEFAULT CURRENT_DATE,
+     rating INT NOT NULL,
+     notes TEXT
+   )`,
+
+  // ---- timetable and homework ----
+  `CREATE TABLE IF NOT EXISTS timetable_slots (
+     section_id UUID NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+     day INT NOT NULL,
+     period INT NOT NULL,
+     subject TEXT NOT NULL,
+     teacher_id UUID REFERENCES users(id) ON DELETE SET NULL,
+     PRIMARY KEY (section_id, day, period)
+   )`,
+  `CREATE TABLE IF NOT EXISTS homework (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+     section_id UUID REFERENCES sections(id) ON DELETE CASCADE,
+     teacher_id UUID REFERENCES users(id) ON DELETE SET NULL,
+     subject TEXT,
+     title TEXT NOT NULL,
+     details TEXT,
+     due_date DATE,
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+
+  // ---- the school's own books ----
+  `CREATE TABLE IF NOT EXISTS books (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     grade TEXT,
+     subject TEXT,
+     added_by UUID REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+  `CREATE TABLE IF NOT EXISTS book_chunks (
+     book_id UUID NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+     idx INT NOT NULL,
+     body TEXT NOT NULL,
+     PRIMARY KEY (book_id, idx)
+   )`,
 ];
+
 
 async function migrate() {
   for (const sql of STEPS) await pool.query(sql);

@@ -15,6 +15,13 @@ const schoolRoutes = require("./routes/school");
 const sectionRoutes = require("./routes/sections");
 const peopleRoutes = require("./routes/people");
 const importRoutes = require("./routes/import");
+const examRoutes = require("./routes/exams");
+const feeRoutes = require("./routes/fees");
+const hrRoutes = require("./routes/hr");
+const timetableRoutes = require("./routes/timetable");
+const homeworkRoutes = require("./routes/homework");
+const bookRoutes = require("./routes/books");
+const parentExtraRoutes = require("./routes/parentExtra");
 
 const app = express();
 app.use(cors());
@@ -34,6 +41,13 @@ app.use("/school", schoolRoutes);
 app.use("/sections", sectionRoutes);
 app.use("/people", peopleRoutes);
 app.use("/import", importRoutes);
+app.use("/exams", examRoutes);
+app.use("/fees", feeRoutes);
+app.use("/hr", hrRoutes);
+app.use("/timetable", timetableRoutes);
+app.use("/homework", homeworkRoutes);
+app.use("/books", bookRoutes);
+app.use("/parent", parentExtraRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
 // eslint-disable-next-line no-unused-vars
