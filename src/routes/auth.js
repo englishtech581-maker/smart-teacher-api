@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { normId } = require("../text");
+const { normId, GENDER_TYPES } = require("../text");
 const pool = require("../db");
 
 const router = express.Router();
@@ -20,7 +20,7 @@ function signToken(user) {
  * - role "teacher" or "parent": joins an existing school (schoolId required).
  */
 router.post("/register", async (req, res) => {
-  const { name, email, password, role, schoolName, schoolId } = req.body;
+  const { name, email, password, role, schoolName, schoolId, genderType } = req.body;
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: "name, email, password and role are required" });
   }
@@ -36,8 +36,8 @@ router.post("/register", async (req, res) => {
     if (role === "admin") {
       if (!schoolName) throw { status: 400, message: "schoolName is required to register as admin" };
       const schoolResult = await client.query(
-        "INSERT INTO schools (name) VALUES ($1) RETURNING id",
-        [schoolName]
+        "INSERT INTO schools (name, gender_type) VALUES ($1, $2) RETURNING id",
+        [schoolName, GENDER_TYPES.includes(genderType) ? genderType : null]
       );
       finalSchoolId = schoolResult.rows[0].id;
     } else {

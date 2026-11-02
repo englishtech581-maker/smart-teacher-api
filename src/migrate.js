@@ -15,6 +15,7 @@ const STEPS = [
   `ALTER TABLE schools ADD COLUMN IF NOT EXISTS school_type TEXT`,
   `ALTER TABLE schools ADD COLUMN IF NOT EXISTS phone TEXT`,
   `ALTER TABLE schools ADD COLUMN IF NOT EXISTS photo TEXT`,
+  `ALTER TABLE schools ADD COLUMN IF NOT EXISTS gender_type TEXT`, // boys, girls or coed
 
   // sections such as 7-A, each with a class teacher
   `CREATE TABLE IF NOT EXISTS sections (
@@ -197,7 +198,37 @@ const STEPS = [
      body TEXT NOT NULL,
      PRIMARY KEY (book_id, idx)
    )`,
+
+  // ---- automatic monthly fee vouchers and reminders ----
+  `CREATE TABLE IF NOT EXISTS fee_plans (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     amount NUMERIC NOT NULL,
+     section_id UUID REFERENCES sections(id) ON DELETE CASCADE
+   )`,
+  `CREATE TABLE IF NOT EXISTS fee_settings (
+     school_id UUID PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+     auto_on BOOLEAN NOT NULL DEFAULT false,
+     due_day INT NOT NULL DEFAULT 10,
+     reminder_days INT NOT NULL DEFAULT 7
+   )`,
+  `CREATE TABLE IF NOT EXISTS fee_notices (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL,
+     month TEXT NOT NULL,
+     message TEXT NOT NULL,
+     phone TEXT,
+     email TEXT,
+     emailed BOOLEAN NOT NULL DEFAULT false,
+     wa_done BOOLEAN NOT NULL DEFAULT false,
+     created_at TIMESTAMPTZ DEFAULT now(),
+     UNIQUE (student_id, kind, month)
+   )`,
 ];
+
 
 
 async function migrate() {

@@ -56,4 +56,13 @@ function toDate(v) {
   return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-module.exports = { normPhone, normId, parseClass, toDate };
+// "M", "male", "Boy" -> Male; "F", "female", "Girl" -> Female; anything else -> null
+function normGender(v) {
+  const s = String(v || "").trim().toLowerCase();
+  if (/^(m|male|boy|man)/.test(s)) return "Male";
+  if (/^(f|female|girl|woman)/.test(s)) return "Female";
+  return null;
+}
+const GENDER_TYPES = ["boys", "girls", "coed"];
+
+module.exports = { normGender, GENDER_TYPES, normPhone, normId, parseClass, toDate };

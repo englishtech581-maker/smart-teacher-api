@@ -24,4 +24,11 @@ async function sectionFor(db, schoolId, grade, name) {
   return r.rows[0].id;
 }
 
-module.exports = { assertClassAccess, sectionFor };
+// A boys' school has only boys and a girls' school only girls, so a blank gender is filled in from the school type.
+async function defaultGender(db, schoolId) {
+  const r = await db.query("SELECT gender_type FROM schools WHERE id = $1", [schoolId]);
+  const t = r.rows[0] && r.rows[0].gender_type;
+  return t === "boys" ? "Male" : t === "girls" ? "Female" : null;
+}
+
+module.exports = { assertClassAccess, sectionFor, defaultGender };

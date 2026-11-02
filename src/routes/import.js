@@ -1,8 +1,8 @@
 const express = require("express");
 const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { sectionFor } = require("../utils");
-const { normPhone, parseClass, toDate } = require("../text");
+const { sectionFor, defaultGender } = require("../utils");
+const { normPhone, parseClass, toDate, normGender } = require("../text");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
@@ -15,6 +15,7 @@ router.post("/students", async (req, res) => {
   const rows = Array.isArray(req.body.rows) ? req.body.rows.slice(0, 1000) : [];
   const schoolId = req.user.schoolId;
   const sections = {};
+  const fallbackGender = await defaultGender(pool, schoolId);
   let imported = 0;
   const skipped = [];
 
@@ -47,7 +48,7 @@ router.post("/students", async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (school_id, admission_no) WHERE admission_no IS NOT NULL DO NOTHING
          RETURNING id`,
-        [schoolId, sectionId, name, adm, clean(r.gender) || null, clean(r.guardianName) || null, phone,
+        [schoolId, sectionId, name, adm, normGender(r.gender) || fallbackGender, clean(r.guardianName) || null, phone,
          clean(r.parentEmail) ? clean(r.parentEmail).toLowerCase() : null]
       );
       if (ins.rowCount) imported++;

@@ -1,8 +1,8 @@
 const express = require("express");
 const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { sectionFor } = require("../utils");
-const { normPhone, parseClass, toDate } = require("../text");
+const { sectionFor, defaultGender } = require("../utils");
+const { normPhone, parseClass, toDate, normGender } = require("../text");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
@@ -53,7 +53,7 @@ router.post("/students", async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [
         req.user.schoolId, sectionId, String(b.name).trim(), String(b.admissionNo || "").trim() || null,
-        b.gender || null, b.guardianName || null, normPhone(b.parentPhone) || null,
+        normGender(b.gender) || (await defaultGender(pool, req.user.schoolId)), b.guardianName || null, normPhone(b.parentPhone) || null,
         b.parentEmail ? String(b.parentEmail).toLowerCase() : null,
       ]
     );
