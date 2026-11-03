@@ -126,4 +126,28 @@ router.delete("/staff/:id", async (req, res) => {
   }
 });
 
+// ---- accounts: the principal can give a teacher or parent a new password (for people with no email, or no email service) ----
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
+router.get("/users", async (req, res) => {
+  const q = `%${String(req.query.q || "").trim()}%`;
+  try {
+    const r = await pool.query(
+      `SELECT id, name, email, role FROM users WHERE school_id = $1 AND role IN ('teacher','parent') AND (name ILIKE $2 OR email ILIKE $2) ORDER BY role, name LIMIT 30`,
+      [req.user.schoolId, q]);
+    res.json(r.rows);
+  } catch { res.status(500).json({ error: "Could not load accounts" }); }
+});
+
+router.post("/users/:id/reset-password", async (req, res) => {
+  try {
+    const u = await pool.query("SELECT id FROM users WHERE id = $1 AND school_id = $2 AND role IN ('teacher','parent')", [req.params.id, req.user.schoolId]);
+    if (u.rowCount === 0) return res.status(404).json({ error: "Account not found" });
+    const letters = "abcdefghjkmnpqrstuvwxyz23456789";
+    const temp = Array.from(crypto.randomBytes(8), (b) => letters[b % letters.length]).join("");
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [await bcrypt.hash(temp, 10), req.params.id]);
+    res.json({ tempPassword: temp });
+  } catch { res.status(500).json({ error: "Could not reset the password" }); }
+});
+
 module.exports = router;

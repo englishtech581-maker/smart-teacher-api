@@ -3,6 +3,7 @@ const pool = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { canUseSection, canSeeStudent } = require("../access");
 const { buildReportCard } = require("../reportcard");
+const { classResults, schoolResults } = require("../results");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -131,6 +132,34 @@ router.get("/report-card/:studentId", async (req, res) => {
     if (!card) return res.status(404).json({ error: "Student not found" });
     res.json(card);
   } catch (e) { console.error(e); res.status(500).json({ error: "Could not build the report card" }); }
+});
+
+// ---- results: a whole class, the whole school, and every report card of a class ----
+// examId is an exam, or "annual" for the whole year's marks together.
+router.get("/results/class", staffOnly, async (req, res) => {
+  try {
+    if (!req.query.sectionId) return res.status(400).json({ error: "Choose a class" });
+    if (!(await canUseSection(req.user, req.query.sectionId))) return res.status(403).json({ error: "You do not teach this class" });
+    const r = await classResults(req.user.schoolId, req.query.sectionId, req.query.examId, req.query.year);
+    if (!r) return res.status(404).json({ error: "Class or exam not found" });
+    res.json(r);
+  } catch (e) { console.error(e); res.status(500).json({ error: "Could not build the class result" }); }
+});
+
+router.get("/results/school", requireRole("admin"), async (req, res) => {
+  try { res.json(await schoolResults(req.user.schoolId, req.query.examId, req.query.year)); }
+  catch (e) { console.error(e); res.status(500).json({ error: "Could not build the school result" }); }
+});
+
+router.get("/report-cards", staffOnly, async (req, res) => {
+  try {
+    if (!req.query.sectionId) return res.status(400).json({ error: "Choose a class" });
+    if (!(await canUseSection(req.user, req.query.sectionId))) return res.status(403).json({ error: "You do not teach this class" });
+    const ids = (await pool.query("SELECT id FROM students WHERE section_id = $1 ORDER BY name LIMIT 100", [req.query.sectionId])).rows;
+    const cards = [];
+    for (const s of ids) cards.push(await buildReportCard(s.id, req.query.year));
+    res.json(cards);
+  } catch (e) { console.error(e); res.status(500).json({ error: "Could not build the report cards" }); }
 });
 
 module.exports = router;

@@ -21,6 +21,7 @@ const hrRoutes = require("./routes/hr");
 const timetableRoutes = require("./routes/timetable");
 const homeworkRoutes = require("./routes/homework");
 const bookRoutes = require("./routes/books");
+const boardRoutes = require("./routes/board");
 const cronRoutes = require("./routes/cron");
 const parentExtraRoutes = require("./routes/parentExtra");
 
@@ -50,6 +51,7 @@ app.use("/homework", homeworkRoutes);
 app.use("/books", bookRoutes);
 app.use("/parent", parentExtraRoutes);
 app.use("/cron", cronRoutes);
+app.use("/board", boardRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
 // eslint-disable-next-line no-unused-vars

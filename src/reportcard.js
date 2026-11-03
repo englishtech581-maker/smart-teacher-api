@@ -28,6 +28,7 @@ async function buildReportCard(studentId, year) {
   if (!s) return null;
   const yr = Number(year) || new Date().getFullYear();
 
+  const passMark = (await pool.query("SELECT pass_mark FROM schools WHERE id = (SELECT school_id FROM students WHERE id = $1)", [studentId])).rows[0].pass_mark;
   const exams = await pool.query("SELECT * FROM exams WHERE school_id = (SELECT school_id FROM students WHERE id = $1) AND year = $2 ORDER BY created_at", [studentId, yr]);
   const out = [];
   for (const e of exams.rows) {
@@ -52,6 +53,7 @@ async function buildReportCard(studentId, year) {
       id: e.id, name: e.name, term: e.term,
       subjects: m.rows.map((r) => ({ ...r, pct: r.total > 0 ? round1((r.marks / r.total) * 100) : null, grade: gradeFor(r.total > 0 ? (r.marks / r.total) * 100 : null) })),
       got, max, pct, grade: gradeFor(pct), position, of,
+      failedIn: m.rows.filter((r) => r.total > 0 && (r.marks / r.total) * 100 < passMark).map((r) => r.subject),
     });
   }
 
@@ -82,7 +84,7 @@ async function buildReportCard(studentId, year) {
 
   return {
     student: { id: s.id, name: s.name, admissionNo: s.admission_no, guardian: s.guardian_name, grade: s.grade, section: s.section },
-    school: s.school_name, year: yr, exams: out,
+    school: s.school_name, year: yr, passMark, exams: out,
     attendancePct, conduct, activities: act.rows, activityPct,
     evaluation: { parts: parts.map((p) => ({ name: p[0], pct: p[1], weight: p[2] })), overall, grade: gradeFor(overall), remark: remarkFor(overall) },
   };

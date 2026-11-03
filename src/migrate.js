@@ -227,7 +227,39 @@ const STEPS = [
      created_at TIMESTAMPTZ DEFAULT now(),
      UNIQUE (student_id, kind, month)
    )`,
+
+  // ---- pass mark, notices, calendar, password reset ----
+  `ALTER TABLE schools ADD COLUMN IF NOT EXISTS pass_mark INT NOT NULL DEFAULT 40`,
+  `CREATE TABLE IF NOT EXISTS announcements (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     body TEXT,
+     audience TEXT NOT NULL DEFAULT 'all',
+     pinned BOOLEAN NOT NULL DEFAULT false,
+     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+  `CREATE TABLE IF NOT EXISTS calendar_events (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     school_id UUID NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+     title TEXT NOT NULL,
+     kind TEXT NOT NULL DEFAULT 'other',
+     start_date DATE NOT NULL,
+     end_date DATE NOT NULL,
+     details TEXT,
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
+  `CREATE INDEX IF NOT EXISTS calendar_school_idx ON calendar_events (school_id, start_date)`,
+  `CREATE TABLE IF NOT EXISTS password_resets (
+     token_hash TEXT PRIMARY KEY,
+     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     expires_at TIMESTAMPTZ NOT NULL,
+     used BOOLEAN NOT NULL DEFAULT false,
+     created_at TIMESTAMPTZ DEFAULT now()
+   )`,
 ];
+
 
 
 

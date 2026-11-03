@@ -23,7 +23,7 @@ function get() {
 async function send({ to, subject, text, fromName }) {
   const from = `"${String(fromName || "School").replace(/"/g, "")}" <${process.env.MAIL_FROM || process.env.SMTP_USER || "school@example.com"}>`;
   const info = await get().sendMail({ from, to, subject, text });
-  if (dry()) console.log("[dry-run email]", to, subject);
+  if (dry()) console.log("[dry-run email]", to, subject, "\n" + text);
   return info;
 }
 
