@@ -23,6 +23,7 @@ function signToken(user) {
  */
 router.post("/register", async (req, res) => {
   const { name, email, password, role, schoolName, schoolId, genderType } = req.body;
+  const inviteCode = String(req.body.inviteCode || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: "name, email, password and role are required" });
   }
@@ -37,11 +38,16 @@ router.post("/register", async (req, res) => {
     let finalSchoolId = schoolId;
     if (role === "admin") {
       if (!schoolName) throw { status: 400, message: "schoolName is required to register as admin" };
+      // Only a school the owner has invited may register: each invitation code works once.
+      if (!inviteCode) throw { status: 403, message: "A new school needs an invitation code from the owner of this app" };
+      const code = await client.query("SELECT id FROM signup_codes WHERE replace(code, '-', '') = $1 AND used_at IS NULL FOR UPDATE", [inviteCode]);
+      if (code.rowCount === 0) throw { status: 403, message: "This invitation code is not valid or was already used" };
       const schoolResult = await client.query(
         "INSERT INTO schools (name, gender_type) VALUES ($1, $2) RETURNING id",
         [schoolName, GENDER_TYPES.includes(genderType) ? genderType : null]
       );
       finalSchoolId = schoolResult.rows[0].id;
+      await client.query("UPDATE signup_codes SET used_at = now(), school_id = $1 WHERE id = $2", [finalSchoolId, code.rows[0].id]);
     } else {
       if (!schoolId) throw { status: 400, message: "schoolId is required for teacher/parent registration" };
       const schoolCheck = await client.query("SELECT id FROM schools WHERE id = $1", [schoolId]);

@@ -258,6 +258,16 @@ const STEPS = [
      used BOOLEAN NOT NULL DEFAULT false,
      created_at TIMESTAMPTZ DEFAULT now()
    )`,
+
+  // ---- only schools the owner has invited can register ----
+  `CREATE TABLE IF NOT EXISTS signup_codes (
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     code TEXT NOT NULL UNIQUE,
+     note TEXT,
+     created_at TIMESTAMPTZ DEFAULT now(),
+     used_at TIMESTAMPTZ,
+     school_id UUID REFERENCES schools(id) ON DELETE SET NULL
+   )`,
 ];
 
 

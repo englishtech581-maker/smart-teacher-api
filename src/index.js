@@ -16,6 +16,7 @@ const sectionRoutes = require("./routes/sections");
 const peopleRoutes = require("./routes/people");
 const importRoutes = require("./routes/import");
 const bulkRoutes = require("./routes/bulk");
+const ownerRoutes = require("./routes/owner");
 const examRoutes = require("./routes/exams");
 const feeRoutes = require("./routes/fees");
 const hrRoutes = require("./routes/hr");
@@ -27,6 +28,7 @@ const cronRoutes = require("./routes/cron");
 const parentExtraRoutes = require("./routes/parentExtra");
 
 const app = express();
+app.set("trust proxy", 1); // behind Render's proxy, so each visitor has their own address
 app.use(cors());
 app.use(express.json({ limit: "5mb" })); // photos and spreadsheet imports are larger than the default
 
@@ -45,6 +47,7 @@ app.use("/sections", sectionRoutes);
 app.use("/people", peopleRoutes);
 app.use("/import", importRoutes);
 app.use("/bulk", bulkRoutes);
+app.use("/owner", ownerRoutes);
 app.use("/exams", examRoutes);
 app.use("/fees", feeRoutes);
 app.use("/hr", hrRoutes);
